@@ -1,6 +1,6 @@
-from flask import Flask
+from flask import Flask, request, abort
 import json
-from config import me, hello
+from config import me, db
 from mock_data import catalog
 
 app = Flask("Server")
@@ -34,15 +34,37 @@ def version():
         "developer": me
     }
 
-    hello()
-
     return json.dumps(v)
 
+
+def fix_id(obj):
+    obj["_id"] = str(obj["_id"])
+    return obj
 
 # get /api/catalog
 @app.get("/api/catalog")
 def get_catalog():
-    return json.dumps(catalog)
+    cursor = db.products.find({})
+    results = []
+    for prod in cursor:
+        results.append(fix_id(prod))
+
+    return json.dumps(results)
+
+
+@app.post("/api/catalog")
+def save_product():
+    product = request.get_json()
+
+    if product is None:
+        return abort(400, "Product required")
+
+        # validate price, title, etc etc
+
+    db.products.insert_one(product)
+    product["_id"] = str(product["_id"])
+
+    return json.dumps(product)
 
 
 
@@ -50,7 +72,8 @@ def get_catalog():
 # return the number of products in the catalog
 @app.get("/api/products/count")
 def total_count():
-    return json.dumps( len(catalog))
+    count = db.products.count_documents({})
+    return json.dumps(count)
 
 
 
@@ -59,7 +82,8 @@ def total_count():
 @app.get("/api/products/total")
 def total_price():
     total = 0
-    for prod in catalog:
+    cursor = db.products.find({})
+    for prod in cursor:
         total += prod["price"]
 
     return json.dumps(total)
@@ -134,4 +158,4 @@ def count_color(color):
 
 
 
-app.run(debug=True)
+# app.run(debug=True)

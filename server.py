@@ -2,6 +2,7 @@ from flask import Flask, request, abort
 import json
 from config import me, db
 from mock_data import catalog
+from bson import ObjectId
 
 app = Flask("Server")
 
@@ -59,6 +60,8 @@ def save_product():
     if product is None:
         return abort(400, "Product required")
 
+    product["category"] = product["category"].lower()
+
         # validate price, title, etc etc
 
     db.products.insert_one(product)
@@ -66,6 +69,30 @@ def save_product():
 
     return json.dumps(product)
 
+
+@app.put("/api/catalog")
+def update_product():
+    product = request.get_json()
+    id = product.pop("_id") # read it and remove it
+    # del product["_id"]    # remove
+
+    db.products.update_one({"_id": ObjectId(id)}, {"$set": product})
+    return json.dumps("Ok")
+
+
+@app.delete("/api/catalog/<id>")
+def delete_product(id):
+    res = db.products.delete_one({"_id": ObjectId(id)})
+    return json.dumps({"count": res.deleted_count})
+
+
+@app.get("/api/product/details/<id>")
+def get_details(id):
+    prod = db.products.find_one({"_id": ObjectId(id)})
+    if prod:
+        return json.dumps(fix_id(prod))
+
+    return abort(404, "Product not found")
 
 
 # get /api/products/count
@@ -94,9 +121,9 @@ def total_price():
 @app.get("/api/catalog/<category>")
 def by_category(category):
     results = []
-    for prod in catalog:
-        if prod["category"].lower() == category.lower():
-            results.append(prod)
+    cursor = db.products.find({"category": category})
+    for prod in cursor:
+        results.append(fix_id(prod))
 
     return json.dumps(results)
 
@@ -106,9 +133,19 @@ def by_category(category):
 @app.get("/api/catalog/lower/<amount>")
 def lower_than(amount):
     results = []
-    for prod in catalog:
-        if prod["price"] < float(amount):
-            results.append(prod)
+    cursor = db.products.find({"price": {"$lt": float(amount)}})
+    for prod in cursor:
+            results.append(fix_id(prod))
+
+    return json.dumps(results)
+
+
+@app.get("/api/catalog/higher/<amount>")
+def higher_than(amount):
+    results = []
+    cursor = db.products.find({"price": {"$gte": float(amount)}})
+    for prod in cursor:
+            results.append(fix_id(prod))
 
     return json.dumps(results)
 
@@ -119,43 +156,16 @@ def lower_than(amount):
 @app.get("/api/category/unique")
 def unique_cats():
     results = []
-    for prod in catalog:
-        category = prod["category"]
-        if not category in results:
-            results.append(category)
+    cursor = db.products.distinct("category")
+    for cat in cursor:
+            results.append(cat)
         
 
     return json.dumps(results)
 
 
 
-@app.get("/api/test/colors")
-def unique_colors():
-    colors = ["red", "blue", "Pink", "yellow", "Red", "Black", "BLUE", "RED", "BLACK", "YELLOW"]
-    results = []
-    for color in colors:
-        color = color.lower()
-        if not color in results:
-            results.append(color)
-
-    return json.dumps(results)
-
-
-
-@app.get("/api/test/count/<color>")
-def count_color(color):
-    colors = ["red", "blue", "Pink", "yellow", "Red", "Black", "BLUE", "RED", "BLACK", "YELLOW"]
-    color = color.lower()
-    results = []
-    count = 0
-    for item in colors:
-        if color == item.lower():
-            count += 1
-
-    return json.dumps(count)
-
-
-
-
-
 # app.run(debug=True)
+
+
+# create an endpoint that allows us to retrieve products with prices greater than a certain value

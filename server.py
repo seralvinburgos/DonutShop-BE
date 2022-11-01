@@ -60,6 +60,30 @@ def save_product():
     if product is None:
         return abort(400, "Product required")
 
+    # should be a title
+    if not "title" in product:
+        return abort(400, "Title required")
+
+    # the title should have at least 5 characters
+    if len(product["title"]) < 5:
+        return abort(400, "Title too short")
+
+    # should be a category
+    if not "category" in product:
+        return abort(400, "Category is required")
+
+    # should be a price
+    if not "price" in product:
+        return abort(400, "Price is required")
+
+    # the price should be a number (int or float)
+    if not isinstance(product["price"], float)) and not isinstance(product["price"], int):
+        return abort(400, "Price must be a number")
+
+    # the number should be greater than 0
+    if product["price"] <= 0:
+        return abort(400, "Invalid price")
+
     product["category"] = product["category"].lower()
 
         # validate price, title, etc etc
@@ -164,8 +188,48 @@ def unique_cats():
     return json.dumps(results)
 
 
+@app.post("/api/coupons")
+def save_coupon():
+    coupon = request.get_json()
 
-# app.run(debug=True)
+    if not coupon:
+        return abort(400, "Coupon can not be empty")
+
+    if not "code" in coupon:
+        return abort(400, "Code is required")
+
+    if not "discount" in coupon:
+        return abort(400, "Discount is required")
+
+    if (not isinstance(coupon["discount"], float)) and not isinstance(coupon["discount"], int):
+        return abort(400, "Discount must be a number")
+
+    db.coupons.insert_one(coupon)
+    fix_id(coupon)
+    return json.dumps(coupon)
 
 
-# create an endpoint that allows us to retrieve products with prices greater than a certain value
+# get api/coupons
+# return all coupons
+@app.get("/api/coupons")
+def all_coupons():
+    cursor = db.coupons.find({})
+    results = []
+    for coupon in cursor:
+        fix_id(coupon)
+        results.append(coupon)
+
+    return json.dumps(results)
+
+
+# create an endpoint that allows
+@app.get("/api/coupons/<code>")
+def coupon_by_code(code):
+    coupon = db.coupons.find_one({"code": code})
+    if coupon:
+        fix_id(coupon)
+        return json.dumps(coupon)
+
+    return abort(404, "Invalid code")
+
+    

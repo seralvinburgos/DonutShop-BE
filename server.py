@@ -3,8 +3,11 @@ import json
 from config import me, db
 from mock_data import catalog
 from bson import ObjectId
+from flask_cors import CORS
 
 app = Flask("Server")
+CORS(app) # disable CORS, enable on production
+## if you are running on debug mode, disable CORS
 
 
 @app.get("/")
@@ -77,7 +80,7 @@ def save_product():
         return abort(400, "Price is required")
 
     # the price should be a number (int or float)
-    if not isinstance(product["price"], float)) and not isinstance(product["price"], int):
+    if (not isinstance(product["price"], float)) and not isinstance(product["price"], int):
         return abort(400, "Price must be a number")
 
     # the number should be greater than 0
@@ -107,6 +110,12 @@ def update_product():
 @app.delete("/api/catalog/<id>")
 def delete_product(id):
     res = db.products.delete_one({"_id": ObjectId(id)})
+    return json.dumps({"count": res.deleted_count})
+
+
+@app.delete("/api/catalog/delete_title/<title>")
+def delete_by_title(title):
+    res = db.products.delete_one({"title": title})
     return json.dumps({"count": res.deleted_count})
 
 
